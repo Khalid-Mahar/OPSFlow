@@ -1,0 +1,16 @@
+{
+  "name": "opsflow-erp-v2",
+  "version": "2.0.0",
+  "description": "OpsFlow ERP v2 — Enterprise Operations Platform",
+  "private": true,
+  "scripts": {
+    "setup": "cd backend && npm install && cd ../frontend && npm install",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm start",
+    "db:setup": "cd backend && npx prisma generate && npx prisma migrate dev --name init",
+    "db:seed": "cd backend && npx ts-node prisma/seed.ts",
+    "db:reset": "cd backend && npx prisma migrate reset && npx ts-node prisma/seed.ts",
+    "db:studio": "cd backend && npx prisma studio",
+    "build:frontend": "cd frontend && npm run build"
+  }
+}
