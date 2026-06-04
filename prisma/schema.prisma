@@ -1,0 +1,753 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+enum AssetCategory {
+  LAPTOP
+  TABLET
+  MOBILE
+  ROUTER
+  CAMERA
+  PRINTER
+  MONITOR
+  NETWORK_DEVICE
+  OTHER
+}
+
+enum AssetStatus {
+  AVAILABLE
+  ASSIGNED
+  UNDER_REPAIR
+  LOST
+  DISPOSED
+}
+
+enum SimNetwork {
+  JAZZ
+  ZONG
+  TELENOR
+  UFONE
+  SCO
+  OTHER
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  TESTING
+  REVIEW
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+  HOLD
+  CANCELLED
+}
+
+enum TodoType {
+  ONE_TIME
+  RECURRING
+}
+
+enum RecurringSchedule {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum TodoStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_DEADLINE
+  PROJECT_UPDATE
+  DISCUSSION_MENTION
+  SIM_EXPIRY
+  WARRANTY_EXPIRY
+  TODO_REMINDER
+  TICKET_ASSIGNED
+  CREDENTIAL_ACCESSED
+  SYSTEM
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  CREATE
+  UPDATE
+  DELETE
+  VIEW
+  ASSIGN
+  UPLOAD
+  DOWNLOAD
+  CREDENTIAL_VIEW
+  PERMISSION_CHANGE
+  STATUS_CHANGE
+  EXPORT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum TicketCategory {
+  HARDWARE
+  SOFTWARE
+  EMAIL
+  NETWORK
+  ERP
+  SIM
+  ACCESS
+  OTHER
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// ─────────────────────────────────────────
+// CORE — Users & RBAC
+// ─────────────────────────────────────────
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users       User[]
+  roles       Role[]
+  employees   Employee[]
+  assets      Asset[]
+  sims        Sim[]
+  projects    Project[]
+  credentials Credential[]
+  files       File[]
+  todos       Todo[]
+  tickets     Ticket[]
+
+  @@map("companies")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions RolePermission[]
+  users       User[]
+
+  @@unique([companyId, name])
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid())
+  module      String
+  action      String
+  description String?
+
+  roles RolePermission[]
+  users UserPermission[]
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserPermission {
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  granted      Boolean    @default(true)
+
+  @@id([userId, permissionId])
+  @@map("user_permissions")
+}
+
+model User {
+  id           String     @id @default(uuid())
+  companyId    String
+  company      Company    @relation(fields: [companyId], references: [id])
+  roleId       String?
+  role         Role?      @relation(fields: [roleId], references: [id])
+  email        String     @unique
+  password     String
+  name         String
+  avatar       String?
+  status       UserStatus @default(ACTIVE)
+  lastLogin    DateTime?
+  refreshToken String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  permissions       UserPermission[]
+  employee          Employee?
+  sessions          UserSession[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  createdTasks      Task[]            @relation("TaskCreator")
+  assignedTasks     Task[]            @relation("TaskAssignee")
+  taskComments      TaskComment[]
+  projectMembers    ProjectMember[]
+  discussions       Discussion[]
+  discussionReplies DiscussionReply[]
+  uploadedFiles     File[]
+  todos             Todo[]
+  assignedTickets   Ticket[]          @relation("TicketAssignee")
+  createdTickets    Ticket[]          @relation("TicketCreator")
+  ticketComments    TicketComment[]
+
+  @@map("users")
+}
+
+model UserSession {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String   @unique
+  deviceInfo String?
+  ipAddress  String?
+  isActive   Boolean  @default(true)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@map("user_sessions")
+}
+
+// ─────────────────────────────────────────
+// MODULE 1 — Employees
+// ─────────────────────────────────────────
+
+model Employee {
+  id           String         @id @default(uuid())
+  companyId    String
+  company      Company        @relation(fields: [companyId], references: [id])
+  userId       String         @unique
+  user         User           @relation(fields: [userId], references: [id])
+  fullName     String
+  cnic         String?
+  phone        String?
+  department   String?
+  designation  String?
+  address      String?
+  joiningDate  DateTime?
+  status       EmployeeStatus @default(ACTIVE)
+  profileImage String?
+  notes        String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?
+
+  documents      EmployeeDocument[]
+  assignedAssets Asset[]
+  assignedSims   Sim[]
+
+  @@map("employees")
+}
+
+model EmployeeDocument {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  name       String
+  type       String
+  url        String
+  size       Int?
+  uploadedAt DateTime @default(now())
+
+  @@map("employee_documents")
+}
+
+// ─────────────────────────────────────────
+// MODULE 2 — Assets
+// ─────────────────────────────────────────
+
+model Asset {
+  id             String        @id @default(uuid())
+  companyId      String
+  company        Company       @relation(fields: [companyId], references: [id])
+  assetTag       String
+  category       AssetCategory
+  brand          String?
+  model          String?
+  serialNumber   String?
+  status         AssetStatus   @default(AVAILABLE)
+  purchaseDate   DateTime?
+  warrantyExpiry DateTime?
+  employeeId     String?
+  employee       Employee?     @relation(fields: [employeeId], references: [id])
+  specs          Json?
+  notes          String?
+  images         String[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+
+  history AssetHistory[]
+  sim     Sim?
+
+  @@unique([companyId, assetTag])
+  @@map("assets")
+}
+
+model AssetHistory {
+  id          String   @id @default(uuid())
+  assetId     String
+  asset       Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  action      String
+  employeeId  String?
+  notes       String?
+  performedBy String?
+  createdAt   DateTime @default(now())
+
+  @@map("asset_history")
+}
+
+// ─────────────────────────────────────────
+// MODULE 3 — SIMs
+// ─────────────────────────────────────────
+
+model Sim {
+  id             String     @id @default(uuid())
+  companyId      String
+  company        Company    @relation(fields: [companyId], references: [id])
+  simNumber      String     @unique
+  network        SimNetwork
+  packageName    String?
+  packageCost    Float?
+  activationDate DateTime?
+  expiryDate     DateTime?
+  employeeId     String?
+  employee       Employee?  @relation(fields: [employeeId], references: [id])
+  assetId        String?    @unique
+  asset          Asset?     @relation(fields: [assetId], references: [id])
+  status         String     @default("active")
+  notes          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  cameras Camera[]
+
+  @@map("sims")
+}
+
+model Camera {
+  id               String    @id @default(uuid())
+  name             String
+  location         String?
+  simId            String?
+  sim              Sim?      @relation(fields: [simId], references: [id])
+  installationDate DateTime?
+  status           String    @default("active")
+  notes            String?
+  images           String[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("cameras")
+}
+
+// ─────────────────────────────────────────
+// MODULE 4 — Credentials Vault
+// ─────────────────────────────────────────
+
+model Credential {
+  id            String    @id @default(uuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id])
+  platform      String
+  category      String?
+  username      String?
+  email         String?
+  passwordEnc   String
+  recoveryEmail String?
+  notes         String?
+  tags          String[]
+  employeeId    String?
+  isActive      Boolean   @default(true)
+  lastAccessed  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accessLogs CredentialAccessLog[]
+
+  @@map("credentials")
+}
+
+model CredentialAccessLog {
+  id           String     @id @default(uuid())
+  credentialId String
+  credential   Credential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  userId       String
+  reason       String?
+  ipAddress    String?
+  accessedAt   DateTime   @default(now())
+
+  @@map("credential_access_logs")
+}
+
+// ─────────────────────────────────────────
+// MODULE 5 — Projects
+// ─────────────────────────────────────────
+
+model Project {
+  id          String        @id @default(uuid())
+  companyId   String
+  company     Company       @relation(fields: [companyId], references: [id])
+  name        String
+  description String?
+  priority    Priority      @default(MEDIUM)
+  status      ProjectStatus @default(PLANNING)
+  progress    Int           @default(0)
+  startDate   DateTime?
+  deadline    DateTime?
+  managerId   String?
+  notes       String?
+  coverColor  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  members     ProjectMember[]
+  tasks       Task[]
+  milestones  Milestone[]
+  discussions Discussion[]
+  files       ProjectFile[]
+
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String   @id @default(uuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("member")
+  joinedAt  DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+model Milestone {
+  id          String    @id @default(uuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  dueDate     DateTime?
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@map("milestones")
+}
+
+model Discussion {
+  id        String   @id @default(uuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  content   String
+  mentions  String[]
+  files     String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  replies DiscussionReply[]
+
+  @@map("discussions")
+}
+
+model DiscussionReply {
+  id           String     @id @default(uuid())
+  discussionId String
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  content      String
+  mentions     String[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("discussion_replies")
+}
+
+model ProjectFile {
+  id        String   @id @default(uuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fileId    String
+  file      File     @relation(fields: [fileId], references: [id])
+  folder    String   @default("Misc")
+  addedAt   DateTime @default(now())
+
+  @@map("project_files")
+}
+
+// ─────────────────────────────────────────
+// MODULE 6 — Tasks
+// ─────────────────────────────────────────
+
+model Task {
+  id             String     @id @default(uuid())
+  projectId      String?
+  project        Project?   @relation(fields: [projectId], references: [id])
+  title          String
+  description    String?
+  creatorId      String
+  creator        User       @relation("TaskCreator", fields: [creatorId], references: [id])
+  assigneeId     String?
+  assignee       User?      @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  priority       Priority   @default(MEDIUM)
+  status         TaskStatus @default(PENDING)
+  deadline       DateTime?
+  estimatedHours Float?
+  loggedHours    Float?     @default(0)
+  tags           String[]
+  order          Int        @default(0)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+
+  comments    TaskComment[]
+  attachments TaskAttachment[]
+
+  @@map("tasks")
+}
+
+model TaskComment {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("task_comments")
+}
+
+model TaskAttachment {
+  id         String   @id @default(uuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  name       String
+  url        String
+  type       String?
+  size       Int?
+  uploadedAt DateTime @default(now())
+
+  @@map("task_attachments")
+}
+
+// ─────────────────────────────────────────
+// MODULE 7 — Daily Operations / Todos
+// ─────────────────────────────────────────
+
+model Todo {
+  id          String             @id @default(uuid())
+  companyId   String
+  company     Company            @relation(fields: [companyId], references: [id])
+  userId      String
+  user        User               @relation(fields: [userId], references: [id])
+  title       String
+  description String?
+  type        TodoType           @default(ONE_TIME)
+  schedule    RecurringSchedule?
+  status      TodoStatus         @default(PENDING)
+  priority    Priority           @default(MEDIUM)
+  dueDate     DateTime?
+  completedAt DateTime?
+  parentId    String?
+  parent      Todo?              @relation("TodoRecurrence", fields: [parentId], references: [id])
+  children    Todo[]             @relation("TodoRecurrence")
+  isArchived  Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@map("todos")
+}
+
+// ─────────────────────────────────────────
+// MODULE 8 — Files
+// ─────────────────────────────────────────
+
+model File {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  name         String
+  originalName String
+  type         String
+  size         Int
+  url          String
+  folder       String?
+
+  uploadedBy String
+  uploader   User   @relation(fields: [uploadedBy], references: [id])
+
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  projectFiles ProjectFile[]
+
+  @@map("files")
+}
+
+// ─────────────────────────────────────────
+// MODULE 9 — Tickets
+// ─────────────────────────────────────────
+
+model Ticket {
+  id          String         @id @default(uuid())
+  companyId   String
+  company     Company        @relation(fields: [companyId], references: [id])
+  title       String
+  description String?
+  category    TicketCategory @default(OTHER)
+  priority    Priority       @default(MEDIUM)
+  status      TicketStatus   @default(OPEN)
+  creatorId   String
+  creator     User           @relation("TicketCreator", fields: [creatorId], references: [id])
+  assigneeId  String?
+  assignee    User?          @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  resolvedAt  DateTime?
+  closedAt    DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  comments TicketComment[]
+
+  @@map("tickets")
+}
+
+model TicketComment {
+  id         String   @id @default(uuid())
+  ticketId   String
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  content    String
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@map("ticket_comments")
+}
+
+// ─────────────────────────────────────────
+// MODULE 10 — Notifications
+// ─────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  link      String?
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────
+// MODULE 11 — Audit Logs
+// ─────────────────────────────────────────
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  companyId  String?
+  userId     String?
+  user       User?       @relation(fields: [userId], references: [id])
+  action     AuditAction
+  module     String
+  entityId   String?
+  entityType String?
+  oldValues  Json?
+  newValues  Json?
+  details    String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+
+  @@map("audit_logs")
+}
