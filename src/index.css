@@ -1,0 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --primary: 239 84% 67%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --ring: 239 84% 67%;
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 222 47% 5%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 7%;
+    --card-foreground: 210 40% 98%;
+    --border: 217 32% 14%;
+    --input: 217 32% 14%;
+    --primary: 239 84% 67%;
+    --primary-foreground: 222.2 47.4% 1.2%;
+    --secondary: 217 32% 10%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 32% 10%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 217 32% 10%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 210 40% 98%;
+    --ring: 239 84% 67%;
+  }
+
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground font-sans antialiased; }
+}
+
+@layer components {
+  /* ── Layout ─────────────────────────────── */
+  .sidebar { @apply fixed top-0 left-0 h-full z-30 bg-card border-r border-border flex flex-col transition-all duration-300; }
+  .main-content { @apply transition-all duration-300 min-h-screen; }
+  .page-header { @apply flex items-center justify-between mb-6; }
+  .page-title { @apply text-2xl font-bold text-foreground tracking-tight; }
+  .page-subtitle { @apply text-sm text-muted-foreground mt-0.5; }
+
+  /* ── Cards ──────────────────────────────── */
+  .card { @apply bg-card border border-border rounded-xl shadow-sm; }
+  .card-header { @apply p-5 border-b border-border; }
+  .card-body { @apply p-5; }
+  .stat-card { @apply card p-5 hover:shadow-md transition-shadow; }
+
+  /* ── Forms ──────────────────────────────── */
+  .field-label { @apply block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5; }
+  .field-input { @apply w-full px-3.5 py-2.5 rounded-lg border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition text-sm; }
+  .field-error { @apply text-xs text-destructive mt-1; }
+
+  /* ── Buttons ────────────────────────────── */
+  .btn { @apply inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed select-none; }
+  .btn-primary { @apply btn bg-primary text-primary-foreground hover:opacity-90 shadow-sm; }
+  .btn-secondary { @apply btn bg-secondary text-secondary-foreground hover:bg-secondary/80; }
+  .btn-ghost { @apply btn hover:bg-accent hover:text-accent-foreground text-muted-foreground; }
+  .btn-destructive { @apply btn bg-destructive/10 text-destructive hover:bg-destructive/20; }
+  .btn-outline { @apply btn border border-border hover:bg-accent text-foreground; }
+
+  /* ── Badges ─────────────────────────────── */
+  .badge { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold; }
+  .badge-default { @apply badge bg-secondary text-secondary-foreground; }
+  .badge-success { @apply badge bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400; }
+  .badge-warning { @apply badge bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400; }
+  .badge-danger { @apply badge bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400; }
+  .badge-info { @apply badge bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400; }
+  .badge-purple { @apply badge bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400; }
+
+  /* ── Table ──────────────────────────────── */
+  .data-table { @apply w-full text-sm; }
+  .data-table th { @apply px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted/50 border-b border-border; }
+  .data-table td { @apply px-4 py-3.5 border-b border-border text-foreground; }
+  .data-table tr:last-child td { @apply border-0; }
+  .data-table tbody tr:hover td { @apply bg-muted/30; }
+
+  /* ── Sidebar Nav ────────────────────────── */
+  .nav-link { @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all cursor-pointer; }
+  .nav-link.active { @apply bg-primary/10 text-primary; }
+
+  /* ── Skeleton ───────────────────────────── */
+  .skeleton { @apply rounded-lg bg-muted animate-shimmer; background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--accent)) 50%, hsl(var(--muted)) 75%); background-size: 200% 100%; }
+
+  /* ── Kanban ─────────────────────────────── */
+  .kanban-col { @apply flex-shrink-0 w-72 rounded-xl p-3 bg-muted/50; }
+  .kanban-card { @apply card p-3.5 cursor-grab active:cursor-grabbing hover:shadow-md transition-all select-none; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { @apply bg-border rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground/40; }
+
+.page-enter { animation: fade-in 0.2s ease-out; }
